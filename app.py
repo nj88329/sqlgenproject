@@ -4,28 +4,33 @@ load_dotenv()
 import os
 import streamlit as st
 import sqlite3
-from huggingface_hub import InferenceClient
 
-# ✅ HuggingFace client
-client = InferenceClient(
-    model="HuggingFaceH4/zephyr-7b-beta",
-    token=os.getenv("HF_TOKEN")
+
+from langchain_google_genai import ChatGoogleGenerativeAI
+
+
+
+gemini_ai_key = os.getenv("gemini_ai_key")
+
+
+
+# LLM setup
+llm = ChatGoogleGenerativeAI(
+    model="gemini-2.5-flash",
+    api_key=gemini_ai_key,
+    temperature=0.2
 )
 
-
+# Generate SQL
 def get_sql_query(question, prompt):
     try:
-        response = client.chat_completion(
-            messages=[
-                {"role": "system", "content": prompt},
-                {"role": "user", "content": question}
-            ],
-            max_tokens=200,
-            temperature=0.2
-        )
+        response = llm.invoke([
+            ("system", prompt),
+            ("human", question)
+        ])
 
         # ✅ correct extraction
-        sql = response.choices[0].message["content"]
+        sql = response.content
 
         # ✅ clean SQL
         sql = sql.replace("```sql", "").replace("```", "").strip()
@@ -37,10 +42,11 @@ def get_sql_query(question, prompt):
         return sql
 
     except Exception as e:
-        print("HF Error:", e)
+        print("Error:", e)
         return None
 
-# ✅ Execute SQL
+
+# Execute SQL
 def read_sql_query(sql, db):
     conn = sqlite3.connect(db)
     cur = conn.cursor()
@@ -52,7 +58,7 @@ def read_sql_query(sql, db):
     return rows
 
 
-# ✅ Prompt (string)
+# Prompt
 prompt = """
 You are a helpful assistant that generates SQL queries.
 
@@ -79,8 +85,8 @@ SQL Query: SELECT employee FROM companies;
 """
 
 
-# ✅ Streamlit UI
-st.title("SQL Query Generator (HuggingFace)")
+# Streamlit UI
+st.title("SQL Query Generator (Gemini)")
 
 user_question = st.text_input("Ask a question about the database:")
 
